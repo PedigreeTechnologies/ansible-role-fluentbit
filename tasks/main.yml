@@ -1,97 +1,76 @@
 ---
-- name: "Install Fluentbit prerequisites."
-  apt:
-    name: "{{ fluentbit_prerequisites }}"
-    state: present
-
-- name: "Import tasks needed to cleanup legacy stuff."
-  import_tasks: cleanup.yml
-
-- name: "Add Fluentbit key."
-  apt_key:
-    url: "{{ fluentbit_apt_key_url }}"
-    keyring: "{{ fluentbit_apt_key_path | default(omit) }}"
-    state: present
-
-- name: "Add Fluentbit repository."
-  apt_repository:
-    repo: |
-      deb [signed-by={{ fluentbit_apt_key_path }}] {{ fluentbit_apt_repos_url }}
-      {{ ansible_distribution_release | lower }} {{ fluentbit_apt_repos_component }}
-    filename: fluentbit
-    state: present
-
-- name: "Get installed Fluentbit version."
-  command: dpkg-query --showformat='${Version}' --show {{ fluentbit_pkg_name }}
-  register: fluentbit_pkg_installed_version
-  failed_when: false
-  changed_when: false
-  check_mode: false
-
-- name: "Unhold Fluentbit version."
-  dpkg_selections:
-    name: "{{ fluentbit_pkg_name }}"
-    selection: install
-  when: not fluentbit_pkg_version_hold or (fluentbit_pkg_installed_version.stdout and fluentbit_pkg_installed_version.stdout != fluentbit_pkg_version)
-
-- name: "Install Fluentbit."
-  apt:
-    name: "{{ fluentbit_pkg_name }}{% if fluentbit_pkg_version is defined and fluentbit_pkg_version != '' %}={{ fluentbit_pkg_version }}{% endif %}"
-    update_cache: true
-    state: present
-  notify: "Restart Fluentbit."
-
-- name: "Hold Fluentbit version."
-  dpkg_selections:
-    name: "{{ fluentbit_pkg_name }}"
-    selection: "hold"
-  when: fluentbit_pkg_version_hold
-
-- name: "Create needed directory."
-  file:
-    path: "{{ fluentbit_dbs_path }}"
+- name: Create yum repo directory
+  ansible.builtin.file:
+    path: /etc/yum.repos.d
     state: directory
     mode: 0755
-  when: fluentbit_dbs_path | length > 0
 
-- name: "Enable Fluentbit service."
-  service:
+- name: Add Fluentbit key
+  ansible.builtin.template:
+    src: yum.conf.j2
+    dest: /etc/yum.repos.d/fluent-bit.repo
+    mode: 0755
+
+- name: Comment out rsyslog time format
+  replace:
+    dest: /etc/rsyslog.conf
+    regexp: '^\$ActionFileDefaultTemplate RSYSLOG_TraditionalFileFormat'
+    replace: '#$ActionFileDefaultTemplate RSYSLOG_TraditionalFileFormat'
+  notify: Restart syslog
+
+- name: Install fluent-bit
+  ansible.builtin.yum:
+    name: "{{ fluentbit_pkg_name }}-{{ fluentbit_pkg_version }}"
+    state: present
+
+- name: Enable Fluentbit service
+  ansible.builtin.systemd:
     name: "{{ fluentbit_svc_name }}"
     enabled: true
+    daemon_reload: true
+  tags: notest
 
-- name: "Create main Fluentbit configuration."
-  template:
-    src: fluent-bit.conf.j2
+- name: Create main Fluentbit configuration.
+  ansible.builtin.template:
+    src: ./templates/fluent-bit.conf.j2
     dest: "{{ fluentbit_conf_file_path }}"
     mode: 0644
-  notify: "Restart Fluentbit."
+  notify: Restart Fluentbit
 
-- name: "Create ansible managed parser file if needed."
-  template:
-    src: managed-parsers.conf.j2
-    dest: "{{ fluentbit_managed_parsers_file }}"
+- name: Create Fluentbit parser configuration
+  ansible.builtin.template:
+    src: ./templates/fluent-bit-parsers.conf.j2
+    dest: "{{ fluentbit_svc_parsers_file }}"
     mode: 0644
-  notify: "Restart Fluentbit."
-  when:
-    - fluentbit_managed_parsers_enable is defined
-    - fluentbit_managed_parsers_enable | bool
+  notify: Restart Fluentbit
 
-- name: "Create needed directory."
-  file:
+# - name: Copy database file
+#   ansible.builtin.copy:
+#     src: ./files/GeoLite2-City_20231010.tar.gz
+#     dest: "{{ fluentbit_conf_directory }}"
+#     mode: 0644
+
+- name: Extract database file
+  ansible.builtin.unarchive:
+    src: "./files/GeoLite2-City_20231010.tar.gz"
+    dest: "{{ fluentbit_conf_directory }}"
+
+- name: Create service.d directory
+  ansible.builtin.file:
     path: "/etc/systemd/system/{{ fluentbit_svc_name }}.service.d"
     state: directory
     mode: 0755
   when: fluentbit_svc_limit_open_files is defined
 
-- name: "Override systemd configuration if needed."
-  template:
+- name: Override systemd configuration if needed
+  ansible.builtin.template:
     src: fluent-bit-override.conf.j2
     dest: "/etc/systemd/system/{{ fluentbit_svc_name }}.service.d/override.conf"
     mode: 0644
   when: fluentbit_svc_limit_open_files is defined
 
-- name: "Delete override systemd configuration if needed."
-  file:
+- name: Delete override systemd configuration if needed
+  ansible.builtin.file:
     path: "/etc/systemd/system/{{ fluentbit_svc_name }}.service.d/override.conf"
     state: absent
   when: fluentbit_svc_limit_open_files is not defined

@@ -1,6 +1,16 @@
 ---
-- name: "Restart Fluentbit."
-  service:
+- name: Restart Fluentbit
+  ansible.builtin.systemd:
     name: "{{ fluentbit_svc_name }}"
     daemon_reload: true
     state: restarted
+  when:
+    - skip_handlers | default("false") == "false"
+
+- name: Restart syslog
+  ansible.builtin.systemd:
+    name: rsyslog
+    daemon_reload: true
+    state: restarted
+  when:
+    - skip_handlers | default("false") == "false"

@@ -1,0 +1,25 @@
+{{ ansible_managed | comment }}
+
+{% for key, value in fluentbit_parsers.items() %}
+[PARSER]
+{% for k, v in value.items()%}
+  {{ k }} {{ v }}
+{% endfor %}
+
+{% endfor %}
+
+{% if fluentbit_multi_parsers is defined %}
+{% for key, value in fluentbit_multi_parsers.items() %}
+[MULTILINE_PARSER]
+{% for k, v in value.items() if k != 'Start' and k != 'Cont' %}
+  {{ k }} {{ v }}
+{% endfor %}
+{% for k, v in value.items() if k == 'Start' %}
+  rule "start_state" {{ v }} "cont"
+{% endfor %}
+{% for k, v in value.items() if k == 'Cont' %}
+  rule "cont" {{ v }} "cont"
+{% endfor %}
+
+{% endfor %}
+{% endif %}

@@ -1,67 +1,283 @@
 ---
+dependency:
+  name: galaxy
 driver:
   name: docker
-lint: |
-  set -e
-  yamllint .
-  ansible-lint --force-color
 platforms:
-  - name: fluentbit_stretch
-    image: debian:stretch
+  - name: pedigree-amazonlinux2-base
+    image: pedigreetechnologies/docker-amazonlinux2-base:latest
+    capabilities:
+      - SYS_ADMIN
     command: /sbin/init
-    tmpfs: ['/tmp', '/run', '/run/lock']
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:ro
-    groups:
-      - fluentbit
-  - name: fluentbit_buster
-    image: debian:buster
-    command: /sbin/init
-    tmpfs: ['/tmp', '/run', '/run/lock']
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:ro
-    groups:
-      - fluentbit
-  - name: fluentbit_bionic
-    image: ubuntu:bionic
-    command: /sbin/init
-    tmpfs: ['/tmp', '/run', '/run/lock']
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:ro
-    groups:
-      - fluentbit
-  - name: fluentbit_focal
-    image: ubuntu:focal
-    command: /sbin/init
-    tmpfs: ['/tmp', '/run', '/run/lock']
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:ro
-    groups:
-      - fluentbit
+    privileged: true
+    pre_build_image: true
 provisioner:
   name: ansible
-  playbook:
-    converge: converge.yml
-    verify: verify.yml
   inventory:
     group_vars:
-      fluentbit:
-        fluentbit_pkg_name: "fluent-bit"
-        fluentbit_svc_name: "fluent-bit"
-        fluentbit_file_input:
-          name: tail
-          alias: file_input
-          path: /var/log/log_input
-          read_from_head: True
-          refresh_interval: 1
-        fluentbit_test_filter:
-          name: modify
-          alias: modify_filter
-          match: '*'
-          0__add: test JUST_A_TEST
-          1__add: test2 JUST_A_TEST2
-        fluentbit_file_output:
-          name: file
-          match: '*'
-          path: /var/log
-          file: check_output.txt
+      all:
+        skip_handlers: true
+        aws_region: us-east-1
+        oneview_environment: development
+        # Opensearch configuration
+        opensearch_host: logs.engineering.pedigreetechnologies.com
+
+        # Log processing
+        fluentbit_inputs:
+          nginx_access:
+            name: tail
+            tag: nginx.standard
+            refresh_interval: 5
+            path: /var/log/nginx/access.log
+            read_from_head: false
+            parser: nginx_general
+            path_key: path
+          nginx_apache_access:
+            name: tail
+            tag: nginx.apache
+            refresh_interval: 5
+            path: /var/log/nginx/apache_access.log
+            read_from_head: false
+            parser: nginx_general
+            path_key: path
+          nginx_imagegen_access:
+            name: tail
+            tag: nginx.imagegen
+            refresh_interval: 5
+            path: /var/log/nginx/imagegen_access.log
+            read_from_head: false
+            parser: nginx_general
+            path_key: path
+          nginx_lineage_access:
+            name: tail
+            tag: nginx.lineage
+            refresh_interval: 5
+            path: /var/log/nginx/lineage_api_access.log
+            read_from_head: false
+            parser: nginx_general
+            path_key: path
+          nginx_misc_access:
+            name: tail
+            tag: nginx.misc
+            refresh_interval: 5
+            path: /var/log/nginx/misc_service_access.log
+            read_from_head: false
+            parser: nginx_services_misc
+            path_key: path
+          nginx_pdf_cache:
+            name: tail
+            tag: nginx.pdf
+            refresh_interval: 5
+            path: /var/log/nginx/pdfsmith_cache.log
+            read_from_head: false
+            parser: nginx_general
+            path_key: path
+          nginx_reports_access:
+            name: tail
+            tag: nginx.reports
+            refresh_interval: 5
+            path: /var/log/nginx/reports_access.log
+            read_from_head: false
+            parser: nginx_general
+            path_key: path
+          nginx_pdf_log:
+            name: tail
+            tag: nginx.pdf
+            refresh_interval: 5
+            path: /var/log/nginx/pdf.log
+            read_from_head: false
+            parser: nginx_error
+            path_key: path
+          nginx_error:
+            name: tail
+            tag: nginx.error
+            refresh_interval: 5
+            path: /var/log/nginx/error.log
+            read_from_head: false
+            parser: nginx_error
+            path_key: path
+          nginx_landmark:
+            name: tail
+            tag: nginx.landmark
+            refresh_interval: 5
+            path: /var/log/nginx/landmark_tile_access.log
+            read_from_head: false
+            parser: nginx_landmark
+            path_key: path
+          nginx_services:
+            name: tail
+            tag: nginx.services
+            refresh_interval: 5
+            path: /var/log/nginx/services.log
+            read_from_head: false
+            parser: nginx_services
+            path_key: path
+            Buffer_Chunk_Size: 100k
+            Buffer_Max_Size: 100k
+          apache_access:
+            name: tail
+            tag: general.apache.access
+            refresh_interval: 5
+            path: /var/log/httpd/access_log
+            read_from_head: false
+            parser: apache_access
+            path_key: path
+          oneview_reports:
+            name: tail
+            tag: general.oneview.reports
+            refresh_interval: 5
+            path: /home/ec2-user/reports/app.log
+            read_from_head: false
+            path_key: path
+            multiline.parser: multiline-oneview
+            Buffer_Chunk_Size: 100k
+            Buffer_Max_Size: 100k
+          oneview_services:
+            name: tail
+            tag: general.oneview.services
+            refresh_interval: 5
+            path: /home/ec2-user/services/app.log
+            read_from_head: false
+            path_key: path
+            multiline.parser: multiline-oneview
+            Buffer_Chunk_Size: 100k
+            Buffer_Max_Size: 100k
+          oneview_offlineprocessor:
+            name: tail
+            tag: general.oneview.offlineprocessor
+            refresh_interval: 5
+            path: /home/ec2-user/offlineprocessor/app.log
+            read_from_head: false
+            path_key: path
+            multiline.parser: multiline-oneview
+            Buffer_Chunk_Size: 100k
+            Buffer_Max_Size: 100k
+          oneview_lineage:
+            name: tail
+            tag: general.oneview.lineage
+            refresh_interval: 5
+            path: /home/ec2-user/lineage/app.log
+            read_from_head: false
+            path_key: path
+            multiline.parser: multiline-oneview
+            Buffer_Chunk_Size: 100k
+            Buffer_Max_Size: 100k
+          apache_error:
+            name: tail
+            tag: general.apache.error
+            refresh_interval: 5
+            path: /var/log/httpd/error_log
+            read_from_head: false
+            parser: apache_error
+            path_key: path
+          secure:
+            name: tail
+            tag: security.secure
+            refresh_interval: 5
+            path: /var/log/secure
+            read_from_head: false
+            parser: secure
+            path_key: path
+
+        fluentbit_filters:
+          # Parser for all onview logs
+          oneview_all:
+            Name: parser
+            Match: general.oneview.*
+            key_name: log
+            parser: oneview
+          # Add type field for security logs
+          security:
+            Name: modify
+            Match: security.*
+            Add: ['type security']
+          # Modify the timestamp field for all records
+          timestamp:
+            Name: modify
+            Match: "*"
+            Rename: ['timestamp @timestamp']
+          # Add host and env for all logs
+          modify:
+            Name: record_modifier
+            Match: "*"
+            Record: ['host ${HOSTNAME}', 'environment {{ oneview_environment }}']
+          # json parser
+          json:
+            Name: parser
+            Parser: json
+            Match: general.oneview.*
+            Reserve_Data: "On"
+            Preserve_Key: "Off"
+            Key_Name: messageJson
+
+        # Parsers
+        fluentbit_parsers:
+          json:
+            Name: json
+            Format: json
+
+        fluentbit_outputs:
+          nginx_out:
+            Name: opensearch
+            Match: nginx.*
+            Host: "{{ opensearch_host }}"
+            Port: 443
+            Index: os-nginx
+            Suppress_Type_Name: "On"
+            Write_Operation: create
+            Generate_ID: "On"
+            AWS_Auth: "On"
+            AWS_Region: "{{ aws_region }}"
+            tls: "On"
+          post_out:
+            Name: opensearch
+            Match: postprocess
+            Host: "{{ opensearch_host }}"
+            Port: 443
+            Index: os-post-processing
+            Suppress_Type_Name: "On"
+            Write_Operation: create
+            Generate_ID: "On"
+            AWS_Auth: "On"
+            AWS_Region: "{{ aws_region }}"
+            tls: "On"
+          security_out:
+            Name: opensearch
+            Match: security.*
+            Host: "{{ opensearch_host }}"
+            Port: 443
+            Index: os-security
+            Suppress_Type_Name: "On"
+            Write_Operation: create
+            Generate_ID: "On"
+            AWS_Auth: "On"
+            AWS_Region: "{{ aws_region }}"
+            tls: "On"
+          general_out:
+            Name: opensearch
+            Match: general.*
+            Host: "{{ opensearch_host }}"
+            Port: 443
+            Index: os-general
+            Suppress_Type_Name: "On"
+            Write_Operation: create
+            Generate_ID: "On"
+            AWS_Auth: "On"
+            AWS_Region: "{{ aws_region }}"
+            tls: "On"
+
+        # List of geoip fields to be added
+        geo_ip:
+          - geoip.countryName remoteAddr %{country.names.en}
+          - geoip.isoCode remoteAddr %{country.iso_code}
+          - geoip.latitude remoteAddr %{location.latitude}
+          - geoip.longitude remoteAddr %{location.longitude}
+          - geoip.regionCode remoteAddr %{subdivisions.0.iso_code}
+          - geoip.cityName remoteAddr %{city.names.en}
+          - geoip.postalCode remoteAddr %{postal.code}
+          # - geoip.regionName remoteAddr %{subdivisions.0.names.en}
+
+        inputs:
+          - path /var/log/secure
+        parsers:
+          - Name json

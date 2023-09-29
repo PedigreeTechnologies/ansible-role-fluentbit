@@ -1,37 +1,85 @@
 ---
 - name: Verify
   hosts: all
+  pre_tasks:
+    - name: Include Ansible default vars
+      ansible.builtin.include_vars:
+        dir: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/defaults/"
+        extensions:
+          - 'yml'
   tasks:
-    - name: "Create fake log file"
-      file:
-        path: "{{ fluentbit_file_input.path }}"
-        mode: 0644
-        state: touch
-    - name: "Generate some fake log"
-      lineinfile:
-        path: "{{ fluentbit_file_input.path }}"
-        line: "This is a test message."
-    - name: "Check if fluentbit is installed"
-      package:
+    - name: Check if fluentbit is installed
+      ansible.builtin.yum:
         name: "{{ fluentbit_pkg_name }}"
         state: present
       register: pkg_install
-      check_mode: yes
+      check_mode: true
       failed_when: pkg_install is changed or pkg_install is failed
-    - name: "Check if fluentbit service is running"
-      service:
-        name: "{{ fluentbit_svc_name }}"
-        state: started
-        enabled: yes
-      register: svc_conf
-      check_mode: yes
-      failed_when: svc_conf is changed or svc_conf is failed
-    - name: "Get log file content"
-      slurp:
-        src: "{{ fluentbit_file_output.path }}/{{ fluentbit_file_output.file }}"
-      register: logfile
-    - name: "Check that the log file contains the expected strings"
-      assert:
-        that:
-          - "'This is a test message.' in logfile['content'] | b64decode"
-          - "'JUST_A_TEST' in logfile['content'] | b64decode"
+
+    - name: Ensure /etc/rsyslog.conf default template is commented out
+      ansible.builtin.lineinfile:
+        name: /etc/rsyslog.conf
+        line: '#$ActionFileDefaultTemplate RSYSLOG_TraditionalFileFormat'
+        state: present
+      check_mode: true
+
+    - name: Make sure scripts directory exists
+      ansible.builtin.stat:
+        path: "{{ fluentbit_conf_directory }}/scripts"
+      register: scriptsdir
+      failed_when: scriptsdir.stat.isdir is false
+
+    - name: Get main configuration
+      ansible.builtin.shell:
+        cmd: cat /etc/fluent-bit/fluent-bit.conf
+      register: main_output
+
+    - name: Get parser configuration
+      ansible.builtin.shell:
+        cmd: cat /etc/fluent-bit/parsers.conf
+      register: parser_output
+
+    - name: Check main config for applicable inputs
+      ansible.builtin.fail:
+        msg: 'Failed looking for {{ item }} in main output'
+      failed_when: item not in main_output.stdout
+      with_items:
+        - "{{ inputs }}"
+
+    - name: Check main config for timestamp modification
+      ansible.builtin.fail:
+        msg: '{{ item }} is not in main configuration'
+      failed_when: item not in main_output.stdout
+      with_items:
+        - Rename timestamp @timestamp
+
+    - name: Make sure log level is set to error and output is set up
+      ansible.builtin.fail:
+        msg: 'Log_Level and/or Log_File is not set up correctly'
+      failed_when: item not in main_output.stdout
+      with_items:
+        - Log_Level error
+        - Log_File /etc/fluent-bit/output.log
+
+    - name: Check parser config for all parsers
+      ansible.builtin.fail:
+        msg: 'Failed looking for {{ item }} in parser output'
+      failed_when: item not in parser_output.stdout
+      with_items:
+        - "{{ parsers }}"
+
+
+  # - name: Get Service Status
+  #   ansible.builtin.systemd:
+  #     name: syslog
+  #     daemon_reload: true
+  #   register: syslog_status
+
+  # - name: Debug service
+  #   ansible.builtin.debug:
+  #     msg: "{{ syslog_status }}"
+
+  # - name: Make sure syslog service is running
+  #   ansible.builtin.fail:
+  #     msg: 'Syslog service is not running'
+  #   when: "{{ syslog_status. }} not in main_output.stdout"

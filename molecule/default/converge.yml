@@ -2,6 +2,14 @@
 - name: Converge
   hosts: all
   tasks:
-    - name: "Include ansible_role_fluentbit"
-      include_role:
-        name: "ansible_role_fluentbit"
+    - name: Install rsyslog
+      ansible.builtin.yum:
+        name: rsyslog
+        state: present
+    - name: Install tar
+      ansible.builtin.yum:
+        name: tar
+        state: present
+    - name: Include ansible_role_fluentbit
+      ansible.builtin.include_role:
+        name: "ansible-role-fluentbit"
