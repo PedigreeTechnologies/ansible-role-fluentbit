@@ -1,9 +1,9 @@
 # ansible/meta/main.yml
 galaxy_info:
-  role_name: ansible
+  role_name: fluentbit
   namespace: pedigreetechnologies
-  author: Charlton Stanley
-  description: Installs ansible
+  author: Dan Masteller
+  description: Installs fluent-bit
   company: Pedigree Technologies
 
   # If the issue tracker for your role is not on github, uncomment the
@@ -34,9 +34,6 @@ galaxy_info:
     - name: Amazon Linux 2
       versions:
         - all
-    - name: Ubuntu
-      versions:
-        - focal
 
   galaxy_tags: []
     # List tags for your role here, one per line. A tag is a keyword that describes
