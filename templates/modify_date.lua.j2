@@ -54,16 +54,12 @@ function modify_oneview(tag, timestamp, record)
       print(key, value)
     end
   end
-  fpath = record["path"]
-  if string.find(fpath, "app.log")
+  if record["timestamp"] ~= nil
   then
-    if record["timestamp"] ~= nil
-    then
-      date = record["timestamp"]
-      local timezone = os.date('%z')
-      newDate = date:gsub("(.*),", "%1.")
-      record["timestamp"] = newDate.." "..timezone
-      return 1, timestamp, record
-    end
+    date = record["timestamp"]
+    local timezone = os.date('%z')
+    newDate = date:gsub("(.*),", "%1.")
+    record["timestamp"] = newDate.." "..timezone
+    return 1, timestamp, record
   end
 end

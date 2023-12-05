@@ -60,7 +60,7 @@
     path: "{{ fluentbit_conf_directory }}/{{ fluentbit_lua_conf_file_path }}"
     state: directory
     mode: 0755
-    
+
 - name: Add Lua files
   ansible.builtin.template:
     src: "{{ item.src }}"
