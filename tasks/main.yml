@@ -55,6 +55,15 @@
     src: "./files/GeoLite2-City_20231010.tar.gz"
     dest: "{{ fluentbit_conf_directory }}"
 
+- name: Add Lua files
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ fluentbit_conf_directory }}/{{ fluentbit_lua_conf_file_path }}/{{ item.name }}"
+    mode: 0644
+  with_items:
+    - {src: ./templates/modify_date.lua.j2, name: modify_date.lua}
+  notify: Restart Fluentbit
+
 - name: Create service.d directory
   ansible.builtin.file:
     path: "/etc/systemd/system/{{ fluentbit_svc_name }}.service.d"

@@ -1,0 +1,69 @@
+-- Add the year to logs that don't have it
+function add_year(tag, timestamp, record)
+  local tb = {}
+  date = record["timestamp"]
+    for i in date:gmatch("%w+") do
+        table.insert(tb, i)
+    end
+  year = (os.date ("%Y"))
+  record["timestamp"] = tb[2].."/"..tb[1].."/"..year..":"..tb[3]..":"..tb[4]..":"..tb[5]
+  return 1, timestamp, record
+end
+
+-- Add utc time zone to apache logs
+function add_apache_utc(tag, timestamp, record)
+  local tb = {}
+  if record["timestamp"] == nil then
+    for key, value in pairs(record) do
+        print("No timestamp for apache record")
+        print(key, value)
+    end
+  end
+  date = record["timestamp"]
+  local timezone = os.date('%z')
+    for i in date:gmatch("%w+") do
+        table.insert(tb, i)
+    end
+    record["timestamp"] = tb[2].."/"..tb[1].."/"..tb[7]..":"..tb[3]..":"..tb[4]..":"..tb[5].."."..tb[6].." "..timezone
+  return 1, timestamp, record
+end
+
+-- Add utc time zone to nginx logs
+function add_nginx_utc(tag, timestamp, record)
+  local tb = {}
+  if record["timestamp"] == nil then
+    for key, value in pairs(record) do
+        print("No timestamp for nginx error")
+        print(key, value)
+    end
+  end
+  date = record["timestamp"]
+  local timezone = os.date('%z')
+    for i in date:gmatch("%w+") do
+        table.insert(tb, i)
+    end
+    record["timestamp"] = tb[1].."-"..tb[2].."-"..tb[3].." "..tb[4]..":"..tb[5]..":"..tb[6].." "..timezone
+  return 1, timestamp, record
+end
+
+-- Replace "," with "." and att utc time zone for oneview logs
+function modify_oneview(tag, timestamp, record)
+  if record["path"] == nil
+  then
+    for key, value in pairs(record) do
+      print(key, value)
+    end
+  end
+  fpath = record["path"]
+  if string.find(fpath, "app.log")
+  then
+    if record["timestamp"] ~= nil
+    then
+      date = record["timestamp"]
+      local timezone = os.date('%z')
+      newDate = date:gsub("(.*),", "%1.")
+      record["timestamp"] = newDate.." "..timezone
+      return 1, timestamp, record
+    end
+  end
+end
