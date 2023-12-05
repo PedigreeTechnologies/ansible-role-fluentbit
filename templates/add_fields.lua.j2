@@ -1,0 +1,14 @@
+-- Adds the type field based on log path (last directory, first word) ex: /var/log/nginx/reports_access.log = nginx_reports
+function add_type(tag, timestamp, record)
+  local tb = {}
+  path = record["path"]
+    for i in path:gmatch("[^/]+") do
+        if string.find(i, "[._]") then
+           i=i:match"([^._]*).(.*)"
+        end
+        table.insert(tb, i)
+    end
+    length = #tb
+    record["type"] = tb[length-1].."_"..tb[length]
+  return 1, timestamp, record
+end
