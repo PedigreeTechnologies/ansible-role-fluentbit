@@ -1,0 +1,10 @@
+-- add requestUriPattern based on requestUri
+function add_request_pattern(tag, timestamp, record)
+  if record["requestUri"] ~= nil
+  then
+    uri = record["requestUri"]
+    pattern = uri:gsub("/[^/]*%d+[^/.]*", "/#")
+    record["requestUriPattern"] = pattern
+  end
+  return 1, timestamp, record
+end

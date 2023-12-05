@@ -69,6 +69,7 @@
   with_items:
     - {src: ./templates/modify_date.lua.j2, name: modify_date.lua}
     - {src: ./templates/add_fields.lua.j2, name: add_fields.lua}
+    - {src: ./templates/add_request_pattern.lua.j2, name: add_request_pattern.lua}
   notify: Restart Fluentbit
 
 - name: Create service.d directory
